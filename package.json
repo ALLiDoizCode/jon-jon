@@ -6,6 +6,9 @@
     "doc": "docs"
   },
   "scripts": {
+    "start": "tsx src/main.ts",
+    "dev": "tsx watch src/main.ts",
+    "build": "tsc",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -13,6 +16,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "mcp-agent-typescript": "^1.0.0",
     "@langchain/openai": "^0.5.15",
     "@modelcontextprotocol/sdk": "^1.13.1",
     "@octokit/rest": "^22.0.0",
@@ -22,7 +26,6 @@
     "express": "^5.1.0",
     "fastmcp": "^3.5.0",
     "langchain": "^0.3.29",
-    "mcp-agent": "^0.0.1",
     "mcp-use": "^0.0.8",
     "simple-git": "^3.28.0",
     "zod": "^3.25.67"

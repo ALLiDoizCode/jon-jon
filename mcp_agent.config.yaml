@@ -1,0 +1,11 @@
+$schema: "https://raw.githubusercontent.com/lastmile-ai/mcp-agent/main/schema/mcp-agent.config.schema.json"
+
+# Jon Jon's MCP Server Configuration
+mcp:
+  servers:
+    filesystem:
+      command: "tsx"
+      args: ["src/servers/filesystem.ts"]
+    git:
+      command: "tsx" 
+      args: ["src/servers/git.ts"]

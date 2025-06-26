@@ -5,15 +5,15 @@ import chalk from 'chalk';
 
 const git = simpleGit();
 const gitServer = new FastMCP({
-  name: "Jon Jon Git Operations Server", 
+  name: "Jon Jon Git Server", 
   version: "1.0.0",
   //@ts-ignore
-  description: "Jon Jon's friendly git management"
+  description: "Jon Jon's version control capabilities"
 });
 
 gitServer.addTool({
   name: "commit",
-  description: "Jon Jon commits changes with a friendly message",
+  description: "Commit changes with a message",
   parameters: z.object({
     message: z.string(),
     files: z.array(z.string()).optional()
@@ -27,11 +27,10 @@ gitServer.addTool({
       }
       
       const result = await git.commit(`🤖 Jon Jon: ${message}`);
-      console.log(chalk.green(`🎉 Jon Jon committed: ${message}`));
-      return `Awesome! Jon Jon committed your changes: "${message}" (${result.commit})`;
+      console.log(chalk.green(`🎉 Committed: ${message}`));
+      return `Committed successfully: "${message}" (${result.commit})`;
     } catch (error) {
-      console.log(chalk.red(`❌ Jon Jon git commit failed: ${error}`));
-      throw new Error(`Oops! Jon Jon couldn't commit that: ${error}`);
+      throw new Error(`Git commit failed: ${error}`);
     }
   }
 });

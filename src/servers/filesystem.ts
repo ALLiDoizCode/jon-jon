@@ -8,12 +8,12 @@ const filesystemServer = new FastMCP({
   name: "Jon Jon Filesystem Server",
   version: "1.0.0",
   //@ts-ignore
-  description: "Jon Jon's friendly file management system"
+  description: "Jon Jon's file management capabilities"
 });
 
 filesystemServer.addTool({
   name: "create_file",
-  description: "Jon Jon creates a file with content",
+  description: "Create a file with content",
   parameters: z.object({
     filepath: z.string(),
     content: z.string(),
@@ -26,10 +26,27 @@ filesystemServer.addTool({
       }
       await fs.writeFile(filepath, content, 'utf8');
       console.log(chalk.green(`📝 Jon Jon created: ${filepath}`));
-      return `Hey! Jon Jon created ${filepath} for you. Looking good! 👍`;
+      return `Successfully created ${filepath}! 👍`;
     } catch (error) {
-      console.log(chalk.red(`❌ Jon Jon couldn't create file: ${error}`));
-      throw new Error(`Oops! Jon Jon couldn't create that file: ${error}`);
+      console.log(chalk.red(`❌ Error creating file: ${error}`));
+      throw new Error(`Failed to create file: ${error}`);
+    }
+  }
+});
+
+filesystemServer.addTool({
+  name: "read_file",
+  description: "Read file contents",
+  parameters: z.object({
+    filepath: z.string()
+  }),
+  execute: async ({ filepath }) => {
+    try {
+      const content = await fs.readFile(filepath, 'utf8');
+      console.log(chalk.blue(`📖 Jon Jon read: ${filepath}`));
+      return content;
+    } catch (error) {
+      throw new Error(`Could not read file: ${error}`);
     }
   }
 });
