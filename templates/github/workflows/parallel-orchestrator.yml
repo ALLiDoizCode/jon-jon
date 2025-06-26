@@ -1,0 +1,224 @@
+name: Parallel Workflow Orchestrator
+
+on:
+  # Trigger on new issues (Genesis workflow)
+  issues:
+    types: [opened, labeled]
+  
+  # Trigger on repository creation (Development workflow)  
+  repository_dispatch:
+    types: [genesis_complete]
+    
+  # Trigger on successful deployments (Content workflow)
+  deployment_status:
+    
+  # Manual orchestration
+  workflow_dispatch:
+    inputs:
+      workflow_type:
+        description: 'Workflow to orchestrate'
+        required: true
+        type: choice
+        options:
+          - 'all'
+          - 'genesis'
+          - 'development' 
+          - 'content'
+      priority:
+        description: 'Priority level'
+        required: false
+        default: 'normal'
+        type: choice
+        options:
+          - 'urgent'
+          - 'high'
+          - 'normal'
+          - 'low'
+
+jobs:
+  orchestrate:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # Run multiple orchestrator instances for high availability
+        instance: [1, 2]
+      fail-fast: false
+      
+    steps:
+    - name: Checkout Orchestrator
+      uses: actions/checkout@v4
+      
+    - name: Setup Claude Code
+      run: |
+        curl -fsSL https://claude.ai/install.sh | sh
+        
+    - name: Load Queue Configuration
+      run: |
+        cp config/queue-system/dispatcher.json ~/.claude/queue-config.json
+        
+    - name: Initialize Shared State
+      run: |
+        mkdir -p shared-state/{projects,queues,instances}
+        
+    - name: Start Orchestrator
+      env:
+        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        INSTANCE_ID: orchestrator-${{ matrix.instance }}
+      run: |
+        claude code --workflow orchestrator \
+          --config ~/.claude/queue-config.json \
+          --shared-state shared-state/ \
+          --instance-id $INSTANCE_ID
+
+  # Genesis workflow instances (parallel)
+  genesis-workers:
+    runs-on: ubuntu-latest
+    if: contains(github.event.inputs.workflow_type, 'genesis') || contains(github.event.inputs.workflow_type, 'all') || github.event_name == 'issues'
+    strategy:
+      matrix:
+        worker_id: [1, 2, 3]
+      fail-fast: false
+      
+    steps:
+    - name: Checkout Workflows
+      uses: actions/checkout@v4
+      
+    - name: Setup Claude Code
+      run: |
+        curl -fsSL https://claude.ai/install.sh | sh
+        
+    - name: Wait for Queue Assignment
+      env:
+        WORKER_ID: genesis-${{ matrix.worker_id }}
+        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        # Poll for work assignment from orchestrator
+        while true; do
+          if [ -f "shared-state/instances/genesis-${{ matrix.worker_id }}.json" ]; then
+            ASSIGNMENT=$(cat shared-state/instances/genesis-${{ matrix.worker_id }}.json)
+            if [ "$ASSIGNMENT" != "{}" ]; then
+              echo "Work assigned: $ASSIGNMENT"
+              break
+            fi
+          fi
+          sleep 30
+        done
+        
+    - name: Execute Genesis Workflow
+      run: |
+        claude code /genesis \
+          --worker-id genesis-${{ matrix.worker_id }} \
+          --shared-state shared-state/
+          
+  # Development workflow instances (parallel)
+  development-workers:
+    runs-on: ubuntu-latest
+    if: contains(github.event.inputs.workflow_type, 'development') || contains(github.event.inputs.workflow_type, 'all') || github.event_name == 'repository_dispatch'
+    strategy:
+      matrix:
+        worker_id: [1, 2, 3, 4, 5]
+      fail-fast: false
+      
+    steps:
+    - name: Checkout Workflows
+      uses: actions/checkout@v4
+      
+    - name: Setup Claude Code
+      run: |
+        curl -fsSL https://claude.ai/install.sh | sh
+        
+    - name: Wait for Queue Assignment
+      env:
+        WORKER_ID: dev-${{ matrix.worker_id }}
+        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        # Poll for development work
+        while true; do
+          if [ -f "shared-state/instances/dev-${{ matrix.worker_id }}.json" ]; then
+            ASSIGNMENT=$(cat shared-state/instances/dev-${{ matrix.worker_id }}.json)
+            if [ "$ASSIGNMENT" != "{}" ]; then
+              echo "Development work assigned: $ASSIGNMENT"
+              break
+            fi
+          fi
+          sleep 45
+        done
+        
+    - name: Execute Development Workflow
+      run: |
+        claude code /develop \
+          --worker-id dev-${{ matrix.worker_id }} \
+          --shared-state shared-state/
+
+  # Content workflow instances (parallel)
+  content-workers:
+    runs-on: ubuntu-latest
+    if: contains(github.event.inputs.workflow_type, 'content') || contains(github.event.inputs.workflow_type, 'all') || github.event_name == 'deployment_status'
+    strategy:
+      matrix:
+        worker_id: [1, 2, 3]
+      fail-fast: false
+      
+    steps:
+    - name: Checkout Workflows
+      uses: actions/checkout@v4
+      
+    - name: Setup Claude Code
+      run: |
+        curl -fsSL https://claude.ai/install.sh | sh
+        
+    - name: Wait for Queue Assignment
+      env:
+        WORKER_ID: content-${{ matrix.worker_id }}
+        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        # Poll for content work
+        while true; do
+          if [ -f "shared-state/instances/content-${{ matrix.worker_id }}.json" ]; then
+            ASSIGNMENT=$(cat shared-state/instances/content-${{ matrix.worker_id }}.json)
+            if [ "$ASSIGNMENT" != "{}" ]; then
+              echo "Content work assigned: $ASSIGNMENT"
+              break
+            fi
+          fi
+          sleep 60
+        done
+        
+    - name: Execute Content Workflow
+      run: |
+        claude code /content \
+          --worker-id content-${{ matrix.worker_id }} \
+          --shared-state shared-state/
+
+  # Monitoring and metrics collection
+  monitor:
+    runs-on: ubuntu-latest
+    needs: [orchestrate]
+    steps:
+    - name: Collect Metrics
+      run: |
+        # Collect performance metrics
+        echo "📊 Workflow Metrics Dashboard"
+        echo "Genesis Queue: $(ls shared-state/queues/genesis-queue/ | wc -l) items"
+        echo "Development Queue: $(ls shared-state/queues/development-queue/ | wc -l) items"  
+        echo "Content Queue: $(ls shared-state/queues/content-queue/ | wc -l) items"
+        echo "Active Projects: $(ls shared-state/projects/ | wc -l)"
+        
+    - name: Health Check
+      run: |
+        # Check instance health
+        for instance in shared-state/instances/*.json; do
+          if [ -f "$instance" ]; then
+            echo "✅ $(basename $instance) is healthy"
+          fi
+        done
+        
+    - name: Alert on Issues
+      if: failure()
+      run: |
+        echo "🚨 Workflow orchestration issues detected"
+        # Send alerts to monitoring system
