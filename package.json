@@ -9,14 +9,14 @@
     "start": "tsx src/main.ts",
     "dev": "tsx watch src/main.ts",
     "build": "tsc",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "tsx src/test-tools.ts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "mcp-agent-typescript": "^1.0.0",
+    "mcp-agent-typescript": "^1.0.1",
     "@langchain/openai": "^0.5.15",
     "@modelcontextprotocol/sdk": "^1.13.1",
     "@octokit/rest": "^22.0.0",

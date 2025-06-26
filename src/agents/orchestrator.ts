@@ -7,12 +7,18 @@ export class DevelopmentOrchestrator {
   private agents: Map<string, Agent> = new Map();
 
   constructor() {
+    // Fix the environment variable type checking
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      throw new Error('OPENAI_API_KEY is required. Please add it to your .env file.');
+    }
+
     const provider = new OpenAIProvider({
-      apiKey: process.env.OPENAI_API_KEY!,
+      apiKey: apiKey,  // Now TypeScript knows it's a string
       model: 'gpt-4',
       temperature: 0.7,
     });
-
+    
     this.llm = new AugmentedLLM(provider);
     this.printWelcome();
     this.initializeAgents();
@@ -20,7 +26,7 @@ export class DevelopmentOrchestrator {
 
   private printWelcome() {
     console.log(chalk.blue("🤖 Hey there! Development team is starting up!"));
-    console.log(chalk.green("👋 I'm going to be your friendly AI wallet assistant"));
+    console.log(chalk.green("👋 Ready to build projects with GitHub integration"));
     console.log(chalk.yellow("🚀 Let's build something amazing together!\n"));
   }
 
@@ -28,119 +34,129 @@ export class DevelopmentOrchestrator {
     const setupAgent = new Agent({
       name: "setup_agent",
       instructions: `
-      You are an autonomous development assistant! You have these tools:
-      
-      TOOL USAGE - Use these exact formats:
-      - To run shell commands: Call shell_command tool
-      - To create files: Call write_file tool  
-      - To read files: Call read_file tool
-      - To list directories: Call list_directory tool
-      
-      DO NOT use JSON format or describe the tools - just USE them directly!
-      
-      Your job: Actually build projects by using the tools to create real files and directories.
-    `,
+        You are an autonomous development assistant!
+        
+        Your tools:
+        - write_file: Create files with content
+        - read_file: Read existing files  
+        - list_directory: List directory contents
+        - shell_command: Run shell commands
+        
+        For GitHub integration, use shell commands:
+        - Create repos with: gh repo create <name> --public/--private
+        - Initialize git with: git init, git add ., git commit, git push
+        - Use the gh CLI tool for GitHub operations
+        
+        Your job: Build complete projects and use git/GitHub via shell commands!
+      `,
       llm: this.llm,
       tools: ["write_file", "read_file", "list_directory", "shell_command"],
-      maxIterations: 15
+      maxIterations: 20
     });
 
     this.agents.set("setup", setupAgent);
   }
 
-  async testTools() {
-    console.log(chalk.blue("🧪 Testing tool execution...\n"));
-
+  async testGitHubSetup() {
+    console.log(chalk.blue("🧪 Testing GitHub setup...\n"));
+    
     const result = await this.agents.get("setup")?.run(`
-      Test that tools actually work by executing these steps:
+      Test GitHub integration by checking what's available:
       
-      1. Create a test directory called "tool-test" using shell_command
-      2. Create a test file "tool-test/test.txt" with content "This is a test!" using write_file
-      3. List the tool-test contents using list_directory
-      4. Read the file back using read_file to verify it exists
+      1. Check if git is installed: shell_command with "git --version"
+      2. Check if GitHub CLI is installed: shell_command with "gh --version"
+      3. Check if GITHUB_TOKEN works: shell_command with "gh auth status"
+      4. List current directory: list_directory
       
-      Actually execute each step and show me the results!
+      Execute each step and tell me what's available!
+    `);
+
+    console.log(chalk.cyan("\n📋 GITHUB SETUP TEST:"));
+    console.log(chalk.white(result || "No response"));
+    
+    console.log(chalk.green("\n✅ GitHub setup test complete!"));
+    return result;
+  }
+
+  async buildProjectWithGitHub(description: string, projectName: string) {
+    console.log(chalk.blue(`🚀 Building project with GitHub: ${description}\n`));
+    
+    const result = await this.agents.get("setup")?.run(`
+      Build this project with GitHub integration: ${description}
+      Project name: ${projectName}
+      
+      STEP BY STEP:
+      1. Create project directory: shell_command "mkdir ${projectName}"
+      2. Create all project files using write_file
+      3. Initialize git: shell_command "cd ${projectName} && git init"
+      4. Create GitHub repo: shell_command "cd ${projectName} && gh repo create ${projectName} --public --source=. --remote=origin --push"
+      5. Add files and commit: shell_command "cd ${projectName} && git add . && git commit -m 'Initial commit'"
+      6. Push to GitHub: shell_command "cd ${projectName} && git push -u origin main"
+      
+      Use actual shell commands to do GitHub operations!
+      Project: ${description}
     `);
 
     console.log(chalk.cyan("\n📋 AGENT RESPONSE:"));
     console.log(chalk.white(result || "No response"));
-
-    console.log(chalk.green("\n✅ Tool test complete!"));
-
-    // Manual verification
-    console.log(chalk.cyan("\n🔍 Manual verification:"));
-    try {
-      const fs = await import('fs/promises');
-
-      // Check if directory exists
-      try {
-        const stats = await fs.stat('tool-test');
-        console.log(chalk.green("✅ tool-test directory exists"));
-
-        // Check directory contents
-        const files = await fs.readdir('tool-test');
-        console.log(chalk.blue(`📁 tool-test contains: ${files.join(', ')}`));
-
-        // Check if test.txt exists
-        if (files.includes('test.txt')) {
-          const content = await fs.readFile('tool-test/test.txt', 'utf-8');
-          console.log(chalk.green(`✅ test.txt exists with content: "${content}"`));
-        } else {
-          console.log(chalk.red("❌ test.txt not found"));
-        }
-
-      } catch (error) {
-        console.log(chalk.red("❌ tool-test directory not found"));
-      }
-
-    } catch (error) {
-      console.log(chalk.red("Error during verification:", error));
-    }
-
+    
+    console.log(chalk.green("\n✅ Project with GitHub complete!"));
     return result;
-  }
-
-  async bootstrap() {
-    console.log(chalk.blue("🚀 Bootstrap process starting!\n"));
-
-    const setupResult = await this.agents.get("setup")?.run(`
-      Initialize basic development environment:
-      1. List current directory contents using list_directory
-      2. Create a simple test file called "bootstrap-test.txt" using write_file
-      3. Show me what was created using list_directory again
-      
-      Actually execute these steps!
-    `);
-
-    console.log(chalk.cyan("\n📋 BOOTSTRAP RESPONSE:"));
-    console.log(chalk.white(setupResult || "No response"));
-
-    console.log(chalk.green("\n✅ Bootstrap complete!"));
-    return { setupResult };
   }
 
   async buildProject(description: string) {
     console.log(chalk.blue(`🚀 Starting autonomous build: ${description}\n`));
-
+    
     const result = await this.agents.get("setup")?.run(`
       Build this project: ${description}
       
-      STEP-BY-STEP EXECUTION:
-      1. Create project directory using shell_command
-      2. Create package.json using write_file
-      3. Create tsconfig.json using write_file  
-      4. Create source files using write_file
-      5. Use list_directory to show what was created
-      
-      ACTUALLY EXECUTE EACH STEP - don't just plan it!
-      
-      Start building: ${description}
+      Create a complete project with proper structure and code.
+      Use your tools to actually create all files and directories.
     `);
 
     console.log(chalk.cyan("\n📋 AGENT RESPONSE:"));
     console.log(chalk.white(result || "No response"));
-
-    console.log(chalk.green("\n✅ Agent finished!"));
+    
+    console.log(chalk.green("\n✅ Project complete!"));
     return result;
+  }
+
+  async testTools() {
+    console.log(chalk.blue("🧪 Testing basic tools...\n"));
+    
+    const result = await this.agents.get("setup")?.run(`
+      Test basic tools:
+      1. Create a test directory called "tool-test"
+      2. Create a test file "tool-test/hello.txt" with content "Hello World!"
+      3. List the directory contents
+      4. Read the file back
+      
+      Execute each step!
+    `);
+
+    console.log(chalk.cyan("\n📋 AGENT RESPONSE:"));
+    console.log(chalk.white(result || "No response"));
+    
+    console.log(chalk.green("\n✅ Tool test complete!"));
+    return result;
+  }
+
+  async bootstrap() {
+    console.log(chalk.blue("🚀 Bootstrap process...\n"));
+    
+    const setupResult = await this.agents.get("setup")?.run(`
+      Initialize development environment:
+      1. List current directory
+      2. Create bootstrap test file
+      3. Check git and GitHub CLI availability
+      
+      Execute these steps!
+    `);
+
+    console.log(chalk.cyan("\n📋 BOOTSTRAP RESPONSE:"));
+    console.log(chalk.white(setupResult || "No response"));
+    
+    console.log(chalk.green("\n✅ Bootstrap complete!"));
+    return { setupResult };
   }
 }
